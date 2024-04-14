@@ -1,79 +1,112 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# mTLS Example Project
 
-# Getting Started
+This project is an example project that showcases mTLS communication with a WebSocket server in a React Native application. The project contains a test server and client that can be used to test the mTLS communication.
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+What is mTLS?
 
-## Step 1: Start the Metro Server
+mTLS (mutual Transport Layer Security) is a security protocol that uses certificates to authenticate both the client and the server in a communication. In mTLS, the client and server exchange certificates to authenticate each other before establishing a secure connection.
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+The `WebSocket` module available in React Native does not support mTLS out of the box, so we have created a react native bridge module which implements native mTLS Websockets to the support mTLS WebSocket communication in a React Native application.
 
-To start Metro, run the following command from the _root_ of your React Native project:
+Important Files:
 
-```bash
-# using npm
-npm start
+- ios/WebsocketsModule.swift
+- ios/WebsocketsModule.m
+- App.js
 
-# OR using Yarn
-yarn start
-```
+# Test Server and Client
 
-## Step 2: Start your Application
+The project contains a test server and client that can be used to test the mTLS communication.
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+## Test Server
 
-### For Android
+- folder: `example-server`
+- file: `test-server.js`
 
-```bash
-# using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### For iOS
+The test server is a WebSocket server that listens on port `8083` and requires mTLS communication. The server uses the certificates in the `certs` folder to authenticate the client.
 
 ```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+cd example-server
+node test-server.js
 ```
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+## Test Client
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+Folder: `example-server`
+File: `test-client.js`
 
-## Step 3: Modifying your App
+The test client is a WebSocket client that connects to the test server. The client uses the certificates in the `certs` folder to authenticate itself to the server.
 
-Now that you have successfully run the app, let's modify it.
+```bash
+cd example-server
+node test-client.js
+```
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+Note: You need to update the `test-client.js` file with the correct path to the certificates and the server URL if you are running the server on a different machine or port.
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+# Generating Certificates
 
-## Congratulations! :tada:
+The `certs` folder contains the certificates that are used by the server and client to authenticate each other. The certificates are generated using the `openssl` command-line tool.
 
-You've successfully run and modified your React Native App. :partying_face:
+## Generate Root CA
 
-### Now what?
+```bash
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 365 -out ca.crt
+```
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
+# Convert your ca.crt to der format
 
-# Troubleshooting
+You need the ca.crt in der format to use it in the iOS project.
 
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+```bash
+openssl x509 -outform der -in ca.crt -out ca.der
+```
 
-# Learn More
+## Generate Server Certificate & Sign with Root CA
 
-To learn more about React Native, take a look at the following resources:
+```bash
+openssl genrsa -out server.key 2048
+openssl req -new -key server.key -out server.csr
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -sha256
+```
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## Generate Client Certificate & Sign with Root CA
+
+```bash
+openssl genrsa -out client.key 2048
+openssl req -new -key client.key -out client.csr
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256
+```
+
+# PKCS12 Format for IOS
+
+To use the certificates in an iOS application, you need to convert them to PKCS12 format.
+
+## Convert Client Certificate to PKCS12
+
+```bash
+openssl pkcs12 -export -out client.p12 -inkey client.key
+-in client.crt -certfile ca.crt
+```
+
+# Adding Certificates to the iOS Project
+
+To use the certificates in the iOS project, you need to add them to the project and make them available to the WebSocket module.
+
+- Drop the p12 file in the ios folder of the project.
+- Add the p12 file to the Xcode project.
+- Update the `WebsocketsModule.swift` file with the correct path to the p12 file.
+- Add them to the Build Phases -> Copy Bundle Resources.
+
+- Since we are using self signed certificates, we need to add the CA certificate to the iOS project.
+- Add the CA certificate in the `ca.der` format to the Xcode project.
+  - Drag and drop the `ca.der` file into your simulator.
+  - Email your CA certificate to yourself and double click it on your iOS device.
+  - Navigate to VPN & Device Management -> Certificates, Identifiers & Profiles -> Identifiers -> App IDs -> Your App ID -> Edit -> Push Notifications -> Configure -> Add the CA certificate.
+
+# How to test
+
+Start the server and edit the App.js file with the correct server URL and certificates path.
+
+If there is a successful connection, you will see the message "Hello Server" in the console.
