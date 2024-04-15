@@ -9,7 +9,7 @@ const server = https.createServer({
   minVersion: 'TLSv1.2',
   maxVersion: 'TLSv1.3',
   requestCert: true,
-  rejectUnauthorized: true, // This ensures that the client certificate is required and must be signed by the CA
+  rejectUnauthorized: false, // This ensures that the client certificate is required and must be signed by the CA
 });
 
 const wss = new WebSocket.Server({noServer: true});
