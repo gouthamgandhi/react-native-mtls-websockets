@@ -33,6 +33,8 @@ const {MTLSWebSocketModule} = NativeModules;
 function App() {
   const [errorMessages, setErrorMessages] = useState([]);
 
+  const [messageFromServer, setMessageFromServer] = useState('');
+
   const isDarkMode = useColorScheme() === 'dark';
   const eventEmitter = new NativeEventEmitter(MTLSWebSocketModule);
 
@@ -40,13 +42,33 @@ function App() {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
 
+  // const connectWebSocket = () => {
+  //   MTLSWebSocketModule.connect('wss://localhost:8083');
+  // };
+
+  // const ipAddress = '192.168.115:443';
+
+  const ipAddress = '192.168.68.150:8083';
+
   const connectWebSocket = () => {
-    MTLSWebSocketModule.connect('wss://localhost:8083');
+    MTLSWebSocketModule.connect(`wss://${ipAddress}/semictrl`);
+  };
+
+  const getServerStatus = () => {
+    const cmd = JSON.stringify({CMD: 'GET-SEMI-STATUS'});
+    MTLSWebSocketModule.send(cmd);
+  };
+
+  const getAllValsFromServer = () => {
+    const cmd = JSON.stringify({CMD: 'IND-GET-VALS-PER'});
+    MTLSWebSocketModule.send(cmd);
   };
 
   useEffect(() => {
     const onMessage = eventEmitter.addListener('onMessage', message => {
       console.log('Message received: ', message);
+      // const parsedMessage = JSON.parse(message);
+      setMessageFromServer(message);
     });
 
     const onError = eventEmitter.addListener('onError', error => {
@@ -92,6 +114,9 @@ function App() {
             backgroundColor: isDarkMode ? Colors.black : Colors.white,
           }}>
           <View style={styles.header}>
+            <Text style={styles.sectionTitle}>
+              MTLS WebSocket @ {ipAddress}
+            </Text>
             <TouchableOpacity onPress={() => connectWebSocket()}>
               <Text>Connect WSS</Text>
             </TouchableOpacity>
@@ -109,6 +134,23 @@ function App() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <View style={{padding: 20}}>
+        <TouchableOpacity
+          onPress={() => getServerStatus()}
+          style={{paddingBottom: 20}}>
+          <Text>Get Server Status</Text>
+        </TouchableOpacity>
+        <Text>Message from server:</Text>
+        <Text>{messageFromServer}</Text>
+      </View>
+
+      <View style={{padding: 20}}>
+        <TouchableOpacity
+          onPress={() => getAllValsFromServer()}
+          style={{paddingBottom: 20}}>
+          <Text>Get All Vals From Server</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
